@@ -2,341 +2,199 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>WELLCON - MUDLOGGING WIRELESS</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
         :root {
-            --bg-color: #1E1E1E;
-            --card-color: #2B2B2B;
-            --btn-color: #0445dc;
-            --text-color: #FFFFFF;
-            --footer-color: #2B2B2B;
-            --logo-color: #00AEEF;
+            --bg: #060d1f;
+            --panel: rgba(10, 22, 48, .78);
+            --panel-solid: #0a1630;
+            --line: rgba(120, 160, 255, .22);
+            --line-strong: rgba(120, 160, 255, .4);
+            --blue: #0445dc;
+            --blue-hi: #2f6bff;
+            --cyan: #22d3ee;
+            --amber: #ffb300;
+            --ok: #22e07a;
+            --text: #eef3ff;
+            --muted: #8fa3c8;
+            --sat: env(safe-area-inset-top, 0px);
+            --sab: env(safe-area-inset-bottom, 0px);
+            --radius: 16px;
         }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        html { -webkit-text-size-adjust: 100%; }
         body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: 'Arial', sans-serif;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
+            background: var(--bg) url('Fundo2.jpg') top center / cover no-repeat fixed;
+            color: var(--text);
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            min-height: 100vh; min-height: 100dvh;
+            display: flex; flex-direction: column;
+            touch-action: manipulation;
+        }
+        body::before { /* véu escuro p/ legibilidade sobre a foto */
+            content: ""; position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: -1;
+            background: linear-gradient(180deg, rgba(6,13,31,.55) 0%, rgba(6,13,31,.78) 100%);
         }
 
+        /* HEADER */
         header {
-            background-color: var(--footer-color);
-            padding: 10px 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid var(--btn-color);
-            flex-wrap: wrap;
+            position: sticky; top: 0; z-index: 50;
+            padding: calc(10px + var(--sat)) 14px 10px;
+            display: flex; justify-content: space-between; align-items: center; gap: 10px;
+            background: rgba(6, 13, 31, .86);
+            -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--line);
+            box-shadow: 0 1px 0 rgba(4,69,220,.6), 0 8px 24px rgba(0,0,0,.35);
         }
-        .logo { font-size: 1.2rem; font-weight: bold; color: var(--logo-color); }
+        .logo { font-size: 1.25rem; font-weight: 800; letter-spacing: .06em; color: var(--cyan); line-height: 1.1; }
         .logo span {
-            color: var(--text-color);
-            font-size: 0.7rem;
-            margin-left: 8px;
-            font-weight: normal;
-            display: block;
-            margin-top: 2px;
+            display: block; margin-top: 3px;
+            font-size: .6rem; font-weight: 500; letter-spacing: .04em; color: var(--muted);
         }
-        .status-bar { text-align: right; font-size: 0.8rem; }
-        .status-indicator {
-            display: inline-block; width: 10px; height: 10px; border-radius: 50%;
-            background-color: #ff0000; margin-right: 5px; vertical-align: middle;
+        .status-bar { text-align: right; flex-shrink: 0; }
+        .status-pill {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 10px; border-radius: 999px;
+            background: rgba(255,255,255,.06); border: 1px solid var(--line);
+            font-size: .72rem; font-weight: 600; color: var(--text);
         }
-        .status-indicator.connected { background-color: #00FF00; box-shadow: 0 0 6px #00FF00; }
-        .clock { font-size: 1rem; font-weight: bold; margin-top: 3px; }
+        .status-indicator { width: 8px; height: 8px; border-radius: 50%; background: #ff4d4d; box-shadow: 0 0 0 3px rgba(255,77,77,.2); }
+        .status-indicator.connected { background: var(--ok); box-shadow: 0 0 0 3px rgba(34,224,122,.22), 0 0 10px var(--ok); }
+        .clock { font-size: 1.05rem; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
 
-        main { flex: 1; padding: 15px; overflow-y: auto; }
-        .view { display: none; animation: fadeIn 0.3s; }
-        .view.active { display: flex; flex-direction: column; align-items: center; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        main { flex: 1; padding: 10px 12px calc(14px + var(--sab)); width: 100%; max-width: 1100px; margin: 0 auto; }
+        .view { display: none; }
+        .view.active { display: flex; flex-direction: column; align-items: center; animation: fadeIn .25s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-        /* MENU GRID */
+        /* MENU */
         .menu-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 15px;
-            width: 100%;
-            max-width: 1200px;
-            margin-top: 20px;
+            display: grid; grid-template-columns: repeat(2, 1fr);
+            gap: 8px; width: 100%; padding-top: 64px;
         }
         .menu-btn {
-            background-color: var(--btn-color);
-            color: white;
-            border: 3px solid #0336b0;
-            padding: 30px 10px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: transform 0.2s, background 0.2s;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            min-height: 100px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
+            position: relative; overflow: hidden;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+            min-height: 84px; padding: 10px 8px;
+            color: var(--text); font: inherit; font-size: .95rem; font-weight: 700; letter-spacing: .03em; text-align: center;
+            background: linear-gradient(160deg, #0a4df0 0%, #0336b0 100%);
+            border: 1px solid var(--line-strong); border-radius: var(--radius);
+            box-shadow: 0 6px 16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.18);
+            cursor: pointer; transition: transform .12s ease, filter .12s ease;
         }
-        .menu-btn:hover { background-color: #0336b0; transform: translateY(-2px); }
-        .menu-btn.main-action {
-    background-color: var(--btn-color);
-    border-color: #0336b0;
-    grid-column: span 2;
-}
-        .menu-btn.main-action:hover { background-color: #0336b0; }
+        .menu-btn::after { /* barra de acento inferior */
+            content: ""; position: absolute; left: 18%; right: 18%; bottom: 0; height: 3px;
+            border-radius: 3px 3px 0 0; background: var(--cyan); opacity: .85;
+        }
+        .menu-btn .ico {
+            display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px;
+            background: rgba(4, 12, 40, .35); border: 1px solid rgba(255,255,255,.14);
+            font-size: 1.2rem; line-height: 1;
+        }
+        .menu-btn:active { transform: scale(.96); filter: brightness(1.15); }
+        .menu-btn:focus-visible, .action-btn:focus-visible, .back-btn:focus-visible, .bomba-btn:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+        .menu-btn.main-action { grid-column: 1 / -1; min-height: 92px; background: linear-gradient(160deg, #1a5cff 0%, #0440c8 100%); }
+        .menu-btn.main-action::after { background: var(--amber); }
 
-        /* CARDS */
+        /* CARD */
         .card {
-            background-color: var(--card-color);
-            border: 2px solid #444;
-            padding: 15px;
-            text-align: center;
-            width: 100%;
-            max-width: 600px;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+            width: 100%; max-width: 640px; margin-top: 8px;
+            padding: 18px 14px; text-align: center;
+            background: var(--panel); border: 1px solid var(--line); border-radius: 20px;
+            -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+            box-shadow: 0 12px 32px rgba(0,0,0,.4);
         }
-        .card-title { font-size: 1.2rem; margin-bottom: 10px; font-weight: bold; }
+        .card-title { font-size: 1.05rem; font-weight: 800; letter-spacing: .05em; margin-bottom: 12px; }
         .value-display {
-            font-size: 2.5rem;
-            font-weight: bold;
-            background: #1A1A1A;
-            padding: 10px;
-            border: 2px solid #444;
-            min-width: 100px;
-            display: inline-block;
-            margin: 8px 0;
+            display: block; margin: 10px auto; padding: 14px 10px; width: 100%; max-width: 460px;
+            font-size: clamp(2.4rem, 13vw, 4.5rem); font-weight: 800; line-height: 1.05;
+            font-variant-numeric: tabular-nums; letter-spacing: -.01em;
+            background: rgba(2, 8, 24, .75); border: 1px solid var(--line); border-radius: 14px;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,.55);
+            overflow-wrap: anywhere;
         }
-        .sub-value { font-size: 0.9rem; color: #888; margin-top: 5px; font-weight: bold; }
+        .sub-value { font-size: .8rem; color: var(--muted); margin-top: 6px; font-weight: 600; letter-spacing: .05em; }
 
-        .config-row {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin: 10px 0;
-        }
-        .config-row label { color: var(--text-color); font-size: 0.9rem; font-weight: bold; }
+        .config-row { display: flex; justify-content: center; align-items: center; gap: 8px 10px; flex-wrap: wrap; margin: 10px 0; }
+        .config-row label { color: var(--muted); font-size: .85rem; font-weight: 600; }
         .config-row input {
-            background: #1A1A1A;
-            border: 1px solid #444;
-            color: var(--text-color);
-            padding: 5px 8px;
-            font-size: 0.9rem;
-            width: 70px;
-            text-align: center;
-            font-weight: bold;
+            width: 84px; padding: 10px 8px; text-align: center;
+            font: inherit; font-size: 1rem; font-weight: 700; color: var(--text);
+            background: rgba(2,8,24,.75); border: 1px solid var(--line); border-radius: 10px;
         }
-        .config-row input:focus { outline: none; border-color: var(--btn-color); }
+        .config-row input:focus { outline: none; border-color: var(--blue-hi); box-shadow: 0 0 0 3px rgba(47,107,255,.3); }
 
-        .action-btn {
-            background-color: #FFC107;
-            color: #000;
-            border: 2px solid #e0a800;
-            padding: 10px 18px;
-            font-size: 0.95rem;
-            font-weight: bold;
-            cursor: pointer;
-            margin: 6px 4px;
-            min-width: 100px;
-            transition: all 0.2s;
+        .action-btn, .back-btn, .bomba-btn {
+            font: inherit; font-weight: 800; cursor: pointer; border-radius: 12px;
+            min-height: 48px; transition: transform .12s ease, filter .12s ease, background .2s;
         }
-        .action-btn:hover { background-color: #e0a800; }
-        .action-btn:active { transform: scale(0.95); }
-        .action-btn.sent {
-            background-color: #28a745 !important;
-            border-color: #218838 !important;
-            color: white !important;
+        .action-btn {
+            margin: 8px 4px 0; padding: 12px 26px; min-width: 130px; font-size: .95rem; letter-spacing: .05em;
+            color: #1a1200; background: linear-gradient(180deg, #ffc533, var(--amber)); border: 1px solid #d99700;
+            box-shadow: 0 4px 12px rgba(255,179,0,.25);
         }
         .back-btn {
-            background-color: var(--btn-color);
-            color: white;
-            border: 2px solid #0336b0;
-            padding: 10px 18px;
-            font-size: 0.95rem;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 12px;
-            width: 100%;
-            max-width: 280px;
+            display: block; width: 100%; max-width: 320px; margin: 16px auto 0; padding: 12px 18px; font-size: .9rem; letter-spacing: .04em;
+            color: var(--text); background: rgba(255,255,255,.06); border: 1px solid var(--line-strong);
         }
-
-        .vu-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-end;
-            height: 150px;
-            width: 30px;
-            background: #1A1A1A;
-            border: 1px solid #444;
-            padding: 8px 4px;
-            margin: 15px auto;
-            position: relative;
-        }
-        .vu-bar {
-            width: 100%;
-            background: #00FF00;
-            transition: height 0.3s ease-out, background 0.3s;
-            height: 0%;
-        }
-        .vu-label {
-            position: absolute;
-            top: 3px;
-            font-size: 0.7rem;
-            font-weight: bold;
-            color: #888;
-        }
-        .vu-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-weight: bold;
-            font-size: 0.9rem;
-            text-shadow: 0 0 3px #000;
-        }
+        .action-btn:active, .back-btn:active, .bomba-btn:active { transform: scale(.96); filter: brightness(1.1); }
+        .action-btn.sent, .bomba-btn.sent { background: var(--ok) !important; border-color: #14b862 !important; color: #04200f !important; }
 
         .progress-container {
-            width: 100%;
-            max-width: 400px;
-            height: 18px;
-            background: #1A1A1A;
-            border: 1px solid #444;
-            margin: 10px auto;
+            width: 100%; max-width: 460px; height: 14px; margin: 12px auto;
+            background: rgba(2,8,24,.75); border: 1px solid var(--line); border-radius: 999px; overflow: hidden;
         }
-        .progress-bar {
-            height: 100%;
-            background: #00FF00;
-            transition: width 0.3s ease-out;
-            width: 0%;
-        }
+        .progress-bar { height: 100%; width: 0%; border-radius: 999px; background: var(--ok); transition: width .3s ease-out; }
 
-        .bombas-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            width: 100%;
-        }
+        /* BOMBAS */
+        .bombas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
         .bomba-card {
-            background: var(--card-color);
-            border: 2px solid #444;
-            padding: 10px 5px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            display: flex; flex-direction: column; align-items: center; padding: 14px 8px;
+            background: rgba(2,8,24,.45); border: 1px solid var(--line); border-radius: 16px;
         }
-        .bomba-title { font-size: 1rem; font-weight: bold; margin-bottom: 5px; }
-        .bomba-ppm-label { font-size: 0.8rem; color: #888; font-weight: bold; }
-        .bomba-ppm {
-            font-size: 2.2rem;
-            font-weight: bold;
-            background: #1A1A1A;
-            border: 2px solid #444;
-            padding: 5px 10px;
-            color: #00FF00;
-            min-width: 80px;
-            margin: 5px 0;
+        .bomba-title { font-size: .95rem; font-weight: 800; margin-bottom: 6px; }
+        .bomba-ppm-label, .bomba-cont-label { font-size: .68rem; color: var(--muted); font-weight: 700; letter-spacing: .08em; margin-top: 6px; }
+        .bomba-ppm, .bomba-cont {
+            width: 100%; margin: 4px 0; text-align: center; font-weight: 800; font-variant-numeric: tabular-nums;
+            background: rgba(2,8,24,.8); border: 1px solid var(--line); border-radius: 12px;
         }
-        .bomba-cont-label { font-size: 0.7rem; color: #888; font-weight: bold; margin-top: 5px; }
-        .bomba-cont {
-            font-size: 1.3rem;
-            font-weight: bold;
-            background: #1A1A1A;
-            border: 2px solid #444;
-            padding: 3px 8px;
-            color: #FFFFFF;
-            min-width: 70px;
-            margin: 3px 0;
-        }
+        .bomba-ppm { font-size: clamp(2rem, 10vw, 3.2rem); padding: 6px 4px; color: var(--ok); }
+        .bomba-cont { font-size: clamp(1.2rem, 6vw, 1.8rem); padding: 4px; }
         .bomba-btn {
-            background-color: #FFC107;
-            color: #000;
-            border: 2px solid #e0a800;
-            padding: 6px 12px;
-            font-size: 0.85rem;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 8px;
-            width: 100%;
-            max-width: 90px;
-            transition: all 0.2s;
-        }
-        .bomba-btn:active { transform: scale(0.95); }
-        .bomba-btn.sent {
-            background-color: #28a745 !important;
-            border-color: #218838 !important;
-            color: white !important;
+            width: 100%; max-width: 120px; margin-top: 10px; padding: 8px 10px; font-size: .85rem;
+            color: #1a1200; background: linear-gradient(180deg, #ffc533, var(--amber)); border: 1px solid #d99700;
         }
 
-        .dual-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            width: 100%;
-        }
+        .dual-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
+        .dual-grid .value-display { font-size: clamp(1.8rem, 9vw, 3rem) !important; padding: 12px 4px; }
 
+        /* NOTIFICAÇÃO */
         .notification {
-            position: fixed;
-            top: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(40, 167, 69, 0.95);
-            color: white;
-            padding: 15px 30px;
-            border-radius: 5px;
-            font-weight: bold;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            z-index: 10000;
-            animation: slideDown 0.3s ease-out;
+            position: fixed; top: calc(76px + var(--sat)); left: 50%; transform: translateX(-50%);
+            width: max-content; max-width: calc(100% - 24px); padding: 12px 20px;
+            background: rgba(20, 150, 80, .96); color: #fff; font-weight: 700; font-size: .9rem; text-align: center;
+            border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.45); z-index: 10000;
+            animation: slideDown .25s ease-out;
         }
-        .notification.error { background: rgba(220, 53, 69, 0.95); }
-        @keyframes slideDown {
-            from { top: 50px; opacity: 0; }
-            to { top: 100px; opacity: 1; }
-        }
+        .notification.error { background: rgba(210, 45, 60, .96); }
+        @keyframes slideDown { from { opacity: 0; margin-top: -12px; } to { opacity: 1; margin-top: 0; } }
 
-        @media (max-width: 768px) {
-            .menu-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-            .menu-btn { padding: 20px 10px; font-size: 1rem; min-height: 80px; }
-            .menu-btn.main-action { grid-column: 1 / -1; }
+        /* TELAS MAIORES */
+        @media (min-width: 600px) {
+            main { padding: 18px 20px 28px; }
+            .menu-grid { grid-template-columns: repeat(4, 1fr); gap: 12px; padding-top: 120px; }
+            .menu-btn { min-height: 100px; font-size: 1rem; }
+            .menu-btn.main-action { grid-area: 2 / 2 / 3 / 4; min-height: 108px; }
+            .menu-btn:nth-child(n+6) { grid-row: 3; }
+            .menu-btn .ico { width: 42px; height: 42px; font-size: 1.4rem; }
+            .logo { font-size: 1.6rem; }
+            .logo span { display: inline; margin-left: 10px; font-size: .75rem; }
+            .card { padding: 26px 22px; }
+            .card-title { font-size: 1.4rem; }
         }
-
-        @media (min-width: 768px) {
-            .card { padding: 25px; max-width: 800px; }
-            .card-title { font-size: 1.5rem; margin-bottom: 15px; }
-            .value-display { font-size: 4rem; min-width: 200px; padding: 15px; }
-            .sub-value { font-size: 1.1rem; }
-            .vu-container { height: 200px; width: 35px; }
-            .progress-container { max-width: 500px; height: 20px; }
-            .back-btn { width: auto; }
-            header { padding: 15px 20px; }
-            .logo { font-size: 1.5rem; }
-            .logo span { font-size: 0.9rem; display: inline; margin-left: 10px; margin-top: 0; }
-            .status-bar { font-size: 1rem; }
-            .clock { font-size: 1.2rem; }
-
-            .bomba-title { font-size: 1.3rem; }
-            .bomba-ppm { font-size: 3rem; min-width: 120px; padding: 10px 15px; }
-            .bomba-cont { font-size: 1.8rem; min-width: 100px; padding: 5px 12px; }
-            .bomba-ppm-label, .bomba-cont-label { font-size: 1rem; }
-            .bomba-btn { font-size: 1rem; padding: 10px 15px; max-width: 120px; }
-            .bombas-grid { gap: 20px; }
-            .bomba-card { padding: 15px 10px; }
-        }
-
-        @media (min-width: 1024px) {
-            .value-display { font-size: 5rem; }
-            .card-title { font-size: 1.8rem; }
-            .bomba-ppm { font-size: 3.5rem; }
-            .bomba-cont { font-size: 2rem; }
-        }
+        @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
     </style>
 </head>
 <body>
@@ -347,7 +205,7 @@
         <span>SISTEMA DE TRANSMISSÃO MUDLOGGING</span>
     </div>
     <div class="status-bar">
-        <div>
+        <div class="status-pill">
             <span id="status-dot" class="status-indicator"></span>
             <span id="status-text">Desconectado</span>
         </div>
@@ -356,20 +214,22 @@
 </header>
 
 <main>
-    <!-- MENU PRINCIPAL -->
     <div id="view-menu" class="view active">
         <div class="menu-grid">
-            <button class="menu-btn" onclick="showView('view-bombas')">🚀 BOMBAS</button>
-            <button class="menu-btn" onclick="showView('view-rpm-mesa')">🔄 RPM MESA</button>
-            <button class="menu-btn" onclick="showView('view-rpm-desgas')">🔄 RPM DESGAS</button>
-            <button class="menu-btn" onclick="showView('view-profundidade')">📏 PROFUND</button>
+            <!-- LINHA 1 -->
+            <button class="menu-btn" onclick="showView('view-bombas')"><span class="ico">🚀</span><span>BOMBAS</span></button>
+            <button class="menu-btn" onclick="showView('view-rpm-mesa')"><span class="ico">🔄</span><span>RPM MESA</span></button>
+            <button class="menu-btn" onclick="showView('view-rpm-desgas')"><span class="ico">🔄</span><span>RPM DESGAS</span></button>
+            <button class="menu-btn" onclick="showView('view-profundidade')"><span class="ico">📏</span><span>PROFUND</span></button>
 
-            <button class="menu-btn" onclick="showView('view-gas')">💨 GÁS</button>
-            <button class="menu-btn main-action" onclick="showView('view-gas-fisico')">🔥 GÁS FÍSICO</button>
-            <button class="menu-btn" onclick="showView('view-pressao')">📊 PRESSÃO</button>
+            <!-- LINHA 2: GÁS FÍSICO centralizado (colunas 2 e 3) -->
+            <button class="menu-btn main-action" onclick="showView('view-gas-fisico')"><span class="ico">🔥</span><span>GÁS FÍSICO</span></button>
 
-            <button class="menu-btn" onclick="showView('view-torque')">🔧 TORQUE</button>
-            <button class="menu-btn" onclick="showView('view-temp')">🌡️ TEMP</button>
+            <!-- LINHA 3 -->
+            <button class="menu-btn" onclick="showView('view-torque')"><span class="ico">🔧</span><span>TORQUE</span></button>
+            <button class="menu-btn" onclick="showView('view-temp')"><span class="ico">🌡️</span><span>TEMP</span></button>
+            <button class="menu-btn" onclick="showView('view-gas')"><span class="ico">💨</span><span>GÁS</span></button>
+            <button class="menu-btn" onclick="showView('view-pressao')"><span class="ico">📊</span><span>PRESSÃO</span></button>
         </div>
     </div>
 
@@ -414,7 +274,7 @@
     <!-- TELA RPM DESGASEIFICADOR -->
     <div id="view-rpm-desgas" class="view">
         <div class="card">
-            <div class="card-title" style="color: #9B59B6">🔄 RPM DO DESGASEIFICADOR</div>
+            <div class="card-title" style="color: #9B59B6"> RPM DO DESGASEIFICADOR</div>
             <div class="sub-value">RPM</div>
             <div id="val-rpm-desgas" class="value-display" style="color: #9B59B6">0</div>
             <div class="sub-value">Contagem de Pulsos: <span id="val-cont-rpm-desgas" style="color: white; font-size: 1.2rem;">0</span></div>
@@ -498,25 +358,15 @@
     <!-- TELA GÁS FÍSICO -->
     <div id="view-gas-fisico" class="view">
         <div class="card">
-            <div class="card-title" style="color: #E74C3C">🔥 GÁS FÍSICO</div>
+            <div class="card-title" style="color: #E74C3C"> GÁS FÍSICO</div>
             <div class="dual-grid">
                 <div>
                     <div class="sub-value">UGT</div>
                     <div id="val-ugt" class="value-display" style="color: #00FF00; font-size: 2.5rem;">0</div>
-                    <div class="vu-container">
-                        <div class="vu-label">VU</div>
-                        <div id="vu-ugt" class="vu-bar"></div>
-                        <div id="vu-ugt-text" class="vu-text">0%</div>
-                    </div>
                 </div>
                 <div>
                     <div class="sub-value">TC</div>
                     <div id="val-tc" class="value-display" style="color: #00FF00; font-size: 2.5rem;">0</div>
-                    <div class="vu-container">
-                        <div class="vu-label">VU</div>
-                        <div id="vu-tc" class="vu-bar"></div>
-                        <div id="vu-tc-text" class="vu-text">0%</div>
-                    </div>
                 </div>
             </div>
             <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
@@ -525,18 +375,15 @@
 </main>
 
 <script>
-    /* ---------- CONFIGURAÇÃO MQTT ---------- */
     const MQTT_BROKER = "broker.emqx.io";
     const USE_SSL = (location.protocol === "https:");
-    const MQTT_PORT = USE_SSL ? 8084 : 8083;   // 8083 = ws, 8084 = wss
+    const MQTT_PORT = USE_SSL ? 8084 : 8083;
     const DEVICE_ID = "esp32_wellguard_station01";
     const TOPIC_DADOS = `wellguard/${DEVICE_ID}/dados`;
     const TOPIC_COMANDOS = `wellguard/${DEVICE_ID}/comandos`;
     const clientID = "web_client_" + Math.random().toString(16).substr(2, 8);
     const client = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, "/mqtt", clientID);
 
-    /* ---------- ESTADO ---------- */
-    // Offsets de tara (nomes DIFERENTES das funções taraXxx)
     let offsetPressao = 0, offsetTorque = 0, offsetTemp = 0;
     let brutoPressao = 0, brutoTorque = 0, brutoTemp = 0;
     let gasMax = 100;
@@ -546,7 +393,6 @@
 
     function $(id) { return document.getElementById(id); }
 
-    /* ---------- GÁS ---------- */
     function atualizarGasMax() {
         const input = $('gas-max');
         const valor = parseFloat(input.value);
@@ -561,16 +407,12 @@
         else { input.value = gasUnit; }
     }
 
-    /* ---------- RENDER DOS SENSORES ANALÓGICOS ---------- */
     function renderSensores() {
         const v = ultimoSensorAna;
-
-        // Gás
         const gas = Math.floor((v / 1023.0) * gasMax);
         $('val-gas').innerText = gas + " " + gasUnit;
         $('progress-gas').style.width = Math.min((gas / gasMax) * 100, 100) + "%";
 
-        // Pressão (4-20mA, 0-1000 PSI)
         const tensao = (v / 1023.0) * 5.0;
         let corrente = 4.0 + (tensao - 1.0) * (16.0 / 4.0);
         corrente = Math.max(4.0, Math.min(20.0, corrente));
@@ -579,36 +421,29 @@
         $('val-press').innerText = pressao.toFixed(1) + " PSI";
         $('progress-press').style.width = Math.min((pressao / 1000) * 100, 100) + "%";
 
-        // Torque (0-500 Nm)
         brutoTorque = (v / 1023.0) * 500;
         const torque = Math.max(0, brutoTorque - offsetTorque);
         $('val-torque').innerText = torque.toFixed(1) + " Nm";
         $('progress-torque').style.width = Math.min((torque / 500) * 100, 100) + "%";
 
-        // Temperatura (0-150 °C)
         brutoTemp = (v / 1023.0) * 150;
         const temp = Math.max(0, brutoTemp - offsetTemp);
         $('val-temp').innerText = temp.toFixed(1) + " °C";
         $('progress-temp').style.width = Math.min((temp / 150) * 100, 100) + "%";
     }
 
-    /* ---------- NOTIFICAÇÃO ---------- */
     function mostrarNotificacao(texto, isError = false) {
         const anterior = document.querySelector('.notification');
         if (anterior) anterior.remove();
-
         const notif = document.createElement('div');
         notif.className = 'notification' + (isError ? ' error' : '');
         notif.innerText = texto;
         document.body.appendChild(notif);
-
         setTimeout(() => { if (notif.parentNode) notif.remove(); }, 2000);
     }
 
-    /* ---------- MQTT ---------- */
     client.onConnectionLost = function (resp) {
         updateStatus(false);
-        console.error("❌ Conexão MQTT perdida:", resp.errorMessage);
         conectando = false;
         setTimeout(connectMQTT, 3000);
     };
@@ -616,17 +451,13 @@
     client.onMessageArrived = function (message) {
         const topico = message.destinationName;
         const raw = message.payloadString;
-        if (topico === TOPIC_COMANDOS) return;   // ignora eco dos próprios comandos
+        if (topico === TOPIC_COMANDOS) return;
         const data = parseTolerante(raw);
         if (data) atualizarInterface(data);
-        else console.error("Mensagem ilegível:", raw);
     };
 
-    // Lê JSON válido; se falhar (ex.: {"senso1", "PPM1":236}), extrai os pares "chave":valor
     function parseTolerante(raw) {
-        try {
-            return JSON.parse(raw);
-        } catch (e) {
+        try { return JSON.parse(raw); } catch (e) {
             const data = {};
             const re = /"([^"]+)"\s*:\s*(-?\d+(?:\.\d+)?|"[^"]*"|true|false|null)/g;
             let m, achou = false;
@@ -637,23 +468,19 @@
         }
     }
 
-
     function connectMQTT() {
         if (conectando || client.isConnected()) return;
         conectando = true;
-        console.log("🔌 Conectando ao MQTT...");
         try {
             client.connect({
                 onSuccess: function () {
                     conectando = false;
                     updateStatus(true);
                     client.subscribe(`wellguard/${DEVICE_ID}/#`);
-                    console.log("✅ Conectado e inscrito em:", TOPIC_DADOS);
                 },
                 onFailure: function (e) {
                     conectando = false;
                     updateStatus(false);
-                    console.error("❌ Falha na conexão:", e.errorMessage);
                     setTimeout(connectMQTT, 3000);
                 },
                 useSSL: USE_SSL,
@@ -662,7 +489,6 @@
             });
         } catch (e) {
             conectando = false;
-            console.error("Erro no connect:", e);
             setTimeout(connectMQTT, 3000);
         }
     }
@@ -679,16 +505,13 @@
         }
     }
 
-    /* ---------- NAVEGAÇÃO ---------- */
     function showView(viewId) {
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         const alvo = $(viewId);
         if (alvo) alvo.classList.add('active');
-        else console.error("View não encontrada:", viewId);
         window.scrollTo(0, 0);
     }
 
-    /* ---------- COMANDOS ---------- */
     function sendCommand(cmd, buttonElement) {
         if (!client.isConnected()) {
             mostrarNotificacao("❌ Sem conexão MQTT!", true);
@@ -699,7 +522,6 @@
             message.destinationName = TOPIC_COMANDOS;
             message.qos = 1;
             client.send(message);
-
             if (buttonElement) {
                 const originalText = buttonElement.innerText;
                 buttonElement.classList.add('sent');
@@ -711,70 +533,46 @@
             }
             return true;
         } catch (e) {
-            console.error("Erro ao enviar comando:", e);
-            mostrarNotificacao("❌ Erro ao enviar comando", true);
+            mostrarNotificacao(" Erro ao enviar comando", true);
             return false;
         }
     }
 
     function zerarBomba1(btn) {
-        $('val-ppm1').innerText = '0';
-        $('val-cont1').innerText = '0';
+        $('val-ppm1').innerText = '0'; $('val-cont1').innerText = '0';
         if (sendCommand('ZERAR_B1', btn)) mostrarNotificacao('✅ Bomba 1 zerada!');
     }
-
     function zerarBomba2(btn) {
-        $('val-ppm2').innerText = '0';
-        $('val-cont2').innerText = '0';
+        $('val-ppm2').innerText = '0'; $('val-cont2').innerText = '0';
         if (sendCommand('ZERAR_B2', btn)) mostrarNotificacao('✅ Bomba 2 zerada!');
     }
-
     function zerarRPM_Mesa(btn) {
-        $('val-rpm-mesa').innerText = '0';
-        $('val-cont-rpm-mesa').innerText = '0';
+        $('val-rpm-mesa').innerText = '0'; $('val-cont-rpm-mesa').innerText = '0';
         if (sendCommand('ZERAR_RPM_MESA', btn)) mostrarNotificacao('✅ RPM Mesa zerada!');
     }
-
     function zerarRPM_Desgas(btn) {
-        $('val-rpm-desgas').innerText = '0';
-        $('val-cont-rpm-desgas').innerText = '0';
-        if (sendCommand('ZERAR_RPM_DESGAS', btn)) mostrarNotificacao('✅ RPM Desgasificador zerado!');
+        $('val-rpm-desgas').innerText = '0'; $('val-cont-rpm-desgas').innerText = '0';
+        if (sendCommand('ZERAR_RPM_DESGAS', btn)) mostrarNotificacao('✅ RPM Desgas zerado!');
     }
-
     function zerarProfundidade(btn) {
         $('val-prof').innerText = '0 m';
         if (sendCommand('ZERAR_PROF', btn)) mostrarNotificacao('✅ Profundidade zerada!');
     }
-
     function taraPressao(btn) {
-        offsetPressao = brutoPressao;
-        renderSensores();
-        if (sendCommand('TARA_PRESS', btn)) mostrarNotificacao('✅ Tara de pressão aplicada!');
+        offsetPressao = brutoPressao; renderSensores();
+        if (sendCommand('TARA_PRESS', btn)) mostrarNotificacao('✅ Tara pressão aplicada!');
     }
-
     function taraTorque(btn) {
-        offsetTorque = brutoTorque;
-        renderSensores();
-        if (sendCommand('TARA_TORQUE', btn)) mostrarNotificacao('✅ Tara de torque aplicada!');
+        offsetTorque = brutoTorque; renderSensores();
+        if (sendCommand('TARA_TORQUE', btn)) mostrarNotificacao('✅ Tara torque aplicada!');
     }
-
     function taraTemp(btn) {
-        offsetTemp = brutoTemp;
-        renderSensores();
-        if (sendCommand('TARA_TEMP', btn)) mostrarNotificacao('✅ Tara de temperatura aplicada!');
+        offsetTemp = brutoTemp; renderSensores();
+        if (sendCommand('TARA_TEMP', btn)) mostrarNotificacao('✅ Tara temperatura aplicada!');
     }
 
-    /* ---------- DADOS ---------- */
     function mapValue(x, in_min, in_max, out_min, out_max) {
         return Math.floor((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min);
-    }
-
-    function atualizarVU(barId, textId, valor, maxValor) {
-        const percent = Math.max(0, Math.min((valor / maxValor) * 100, 100));
-        const bar = $(barId);
-        bar.style.height = percent + "%";
-        bar.style.background = percent < 60 ? '#00FF00' : (percent < 80 ? '#FFFF00' : '#FF0000');
-        $(textId).innerText = Math.floor(percent) + "%";
     }
 
     function pick(data, nomes) {
@@ -789,15 +587,15 @@
     }
 
     function atualizarInterface(data) {
-        const cont1 = pick(data, ['contagem1', 'cont1', 'count1', 'pulsos1']);
-        const ppm1  = pick(data, ['PPM1', 'spm1', 'bomba1']);
-        const cont2 = pick(data, ['contagem2', 'cont2', 'count2', 'pulsos2']);
-        const ppm2  = pick(data, ['PPM2', 'spm2', 'bomba2']);
-        const rpmMesa  = pick(data, ['rpmMesa', 'rpm_mesa', 'RPM1']);
-        const contMesa = pick(data, ['contRpmMesa', 'cont_rpm_mesa', 'contagemRPM1']);
-        const rpmDes   = pick(data, ['rpmDesgas', 'rpm_desgas', 'RPM2']);
-        const contDes  = pick(data, ['contRpmDesgas', 'cont_rpm_desgas', 'contagemRPM2']);
-        const prof     = pick(data, ['Profundidade', 'prof', 'depth']);
+        const cont1 = pick(data, ['contagem1','cont1','count1','pulsos1']);
+        const ppm1  = pick(data, ['PPM1','spm1','bomba1']);
+        const cont2 = pick(data, ['contagem2','cont2','count2','pulsos2']);
+        const ppm2  = pick(data, ['PPM2','spm2','bomba2']);
+        const rpmMesa  = pick(data, ['rpmMesa','rpm_mesa','RPM1']);
+        const contMesa = pick(data, ['contRpmMesa','cont_rpm_mesa','contagemRPM1']);
+        const rpmDes   = pick(data, ['rpmDesgas','rpm_desgas','RPM2']);
+        const contDes  = pick(data, ['contRpmDesgas','cont_rpm_desgas','contagemRPM2']);
+        const prof     = pick(data, ['Profundidade','prof','depth']);
 
         if (cont1 !== undefined) $('val-cont1').innerText = cont1;
         if (ppm1  !== undefined) $('val-ppm1').innerText = ppm1;
@@ -814,33 +612,18 @@
             $('val-rpm-desgas').innerText = rd;
             $('val-cont-rpm-desgas').innerText = (contDes !== undefined ? contDes : cont2) || 0;
         }
-
         if (prof !== undefined) $('val-prof').innerText = prof + " m";
 
-        const ana = pick(data, ['sensorAna', 'analog', 'sensor_ana']);
-        if (ana !== undefined) {
-            ultimoSensorAna = parseFloat(ana) || 0;
-            renderSensores();
-        }
+        const ana = pick(data, ['sensorAna','analog','sensor_ana']);
+        if (ana !== undefined) { ultimoSensorAna = parseFloat(ana) || 0; renderSensores(); }
 
-        const ugtRaw = pick(data, ['UGT1', 'UGT']);
-        if (ugtRaw !== undefined) {
-            const ugt = mapValue(parseInt(ugtRaw), 0, 1023, 0, 400);
-            $('val-ugt').innerText = ugt;
-            atualizarVU('vu-ugt', 'vu-ugt-text', ugt, 400);
-        }
-        const tcRaw = pick(data, ['TC1', 'TC']);
-        if (tcRaw !== undefined) {
-            const tc = mapValue(parseInt(tcRaw), 0, 1023, 0, 4000);
-            $('val-tc').innerText = tc;
-            atualizarVU('vu-tc', 'vu-tc-text', tc, 4000);
-        }
+        const ugtRaw = pick(data, ['UGT1','UGT']);
+        if (ugtRaw !== undefined) $('val-ugt').innerText = mapValue(parseInt(ugtRaw), 0, 1023, 0, 400);
+        const tcRaw = pick(data, ['TC1','TC']);
+        if (tcRaw !== undefined) $('val-tc').innerText = mapValue(parseInt(tcRaw), 0, 1023, 0, 4000);
     }
 
-    function updateClock() {
-        $('clock').innerText = new Date().toLocaleTimeString('pt-BR');
-    }
-
+    function updateClock() { $('clock').innerText = new Date().toLocaleTimeString('pt-BR'); }
     setInterval(updateClock, 1000);
     updateClock();
     connectMQTT();
