@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WELLCON - MUDLOGGING WIRELESS</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #1E1E1E;
+            --card-color: #2B2B2B;
+            --btn-color: #0445dc;
+            --text-color: #FFFFFF;
+            --footer-color: #2B2B2B;
+            --logo-color: #00AEEF;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Arial', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background-color: var(--footer-color);
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--btn-color);
+            flex-wrap: wrap;
+        }
+        .logo { font-size: 1.2rem; font-weight: bold; color: var(--logo-color); }
+        .logo span {
+            color: var(--text-color);
+            font-size: 0.7rem;
+            margin-left: 8px;
+            font-weight: normal;
+            display: block;
+            margin-top: 2px;
+        }
+        .status-bar { text-align: right; font-size: 0.8rem; }
+        .status-indicator {
+            display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+            background-color: #ff0000; margin-right: 5px; vertical-align: middle;
+        }
+        .status-indicator.connected { background-color: #00FF00; box-shadow: 0 0 6px #00FF00; }
+        .clock { font-size: 1rem; font-weight: bold; margin-top: 3px; }
+
+        main { flex: 1; padding: 15px; overflow-y: auto; }
+        .view { display: none; animation: fadeIn 0.3s; }
+        .view.active { display: flex; flex-direction: column; align-items: center; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* MENU GRID */
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            width: 100%;
+            max-width: 1200px;
+            margin-top: 20px;
+        }
+        .menu-btn {
+            background-color: var(--btn-color);
+            color: white;
+            border: 3px solid #0336b0;
+            padding: 30px 10px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        .menu-btn:hover { background-color: #0336b0; transform: translateY(-2px); }
+        .menu-btn.main-action {
+    background-color: var(--btn-color);
+    border-color: #0336b0;
+    grid-column: span 2;
+}
+        .menu-btn.main-action:hover { background-color: #0336b0; }
+
+        /* CARDS */
+        .card {
+            background-color: var(--card-color);
+            border: 2px solid #444;
+            padding: 15px;
+            text-align: center;
+            width: 100%;
+            max-width: 600px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+        }
+        .card-title { font-size: 1.2rem; margin-bottom: 10px; font-weight: bold; }
+        .value-display {
+            font-size: 2.5rem;
+            font-weight: bold;
+            background: #1A1A1A;
+            padding: 10px;
+            border: 2px solid #444;
+            min-width: 100px;
+            display: inline-block;
+            margin: 8px 0;
+        }
+        .sub-value { font-size: 0.9rem; color: #888; margin-top: 5px; font-weight: bold; }
+
+        .config-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 10px 0;
+        }
+        .config-row label { color: var(--text-color); font-size: 0.9rem; font-weight: bold; }
+        .config-row input {
+            background: #1A1A1A;
+            border: 1px solid #444;
+            color: var(--text-color);
+            padding: 5px 8px;
+            font-size: 0.9rem;
+            width: 70px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .config-row input:focus { outline: none; border-color: var(--btn-color); }
+
+        .action-btn {
+            background-color: #FFC107;
+            color: #000;
+            border: 2px solid #e0a800;
+            padding: 10px 18px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 6px 4px;
+            min-width: 100px;
+            transition: all 0.2s;
+        }
+        .action-btn:hover { background-color: #e0a800; }
+        .action-btn:active { transform: scale(0.95); }
+        .action-btn.sent {
+            background-color: #28a745 !important;
+            border-color: #218838 !important;
+            color: white !important;
+        }
+        .back-btn {
+            background-color: var(--btn-color);
+            color: white;
+            border: 2px solid #0336b0;
+            padding: 10px 18px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 12px;
+            width: 100%;
+            max-width: 280px;
+        }
+
+        .vu-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            height: 150px;
+            width: 30px;
+            background: #1A1A1A;
+            border: 1px solid #444;
+            padding: 8px 4px;
+            margin: 15px auto;
+            position: relative;
+        }
+        .vu-bar {
+            width: 100%;
+            background: #00FF00;
+            transition: height 0.3s ease-out, background 0.3s;
+            height: 0%;
+        }
+        .vu-label {
+            position: absolute;
+            top: 3px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            color: #888;
+        }
+        .vu-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-weight: bold;
+            font-size: 0.9rem;
+            text-shadow: 0 0 3px #000;
+        }
+
+        .progress-container {
+            width: 100%;
+            max-width: 400px;
+            height: 18px;
+            background: #1A1A1A;
+            border: 1px solid #444;
+            margin: 10px auto;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #00FF00;
+            transition: width 0.3s ease-out;
+            width: 0%;
+        }
+
+        .bombas-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            width: 100%;
+        }
+        .bomba-card {
+            background: var(--card-color);
+            border: 2px solid #444;
+            padding: 10px 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .bomba-title { font-size: 1rem; font-weight: bold; margin-bottom: 5px; }
+        .bomba-ppm-label { font-size: 0.8rem; color: #888; font-weight: bold; }
+        .bomba-ppm {
+            font-size: 2.2rem;
+            font-weight: bold;
+            background: #1A1A1A;
+            border: 2px solid #444;
+            padding: 5px 10px;
+            color: #00FF00;
+            min-width: 80px;
+            margin: 5px 0;
+        }
+        .bomba-cont-label { font-size: 0.7rem; color: #888; font-weight: bold; margin-top: 5px; }
+        .bomba-cont {
+            font-size: 1.3rem;
+            font-weight: bold;
+            background: #1A1A1A;
+            border: 2px solid #444;
+            padding: 3px 8px;
+            color: #FFFFFF;
+            min-width: 70px;
+            margin: 3px 0;
+        }
+        .bomba-btn {
+            background-color: #FFC107;
+            color: #000;
+            border: 2px solid #e0a800;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 8px;
+            width: 100%;
+            max-width: 90px;
+            transition: all 0.2s;
+        }
+        .bomba-btn:active { transform: scale(0.95); }
+        .bomba-btn.sent {
+            background-color: #28a745 !important;
+            border-color: #218838 !important;
+            color: white !important;
+        }
+
+        .dual-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 100%;
+        }
+
+        .notification {
+            position: fixed;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(40, 167, 69, 0.95);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 5px;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 10000;
+            animation: slideDown 0.3s ease-out;
+        }
+        .notification.error { background: rgba(220, 53, 69, 0.95); }
+        @keyframes slideDown {
+            from { top: 50px; opacity: 0; }
+            to { top: 100px; opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            .menu-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+            .menu-btn { padding: 20px 10px; font-size: 1rem; min-height: 80px; }
+            .menu-btn.main-action { grid-column: 1 / -1; }
+        }
+
+        @media (min-width: 768px) {
+            .card { padding: 25px; max-width: 800px; }
+            .card-title { font-size: 1.5rem; margin-bottom: 15px; }
+            .value-display { font-size: 4rem; min-width: 200px; padding: 15px; }
+            .sub-value { font-size: 1.1rem; }
+            .vu-container { height: 200px; width: 35px; }
+            .progress-container { max-width: 500px; height: 20px; }
+            .back-btn { width: auto; }
+            header { padding: 15px 20px; }
+            .logo { font-size: 1.5rem; }
+            .logo span { font-size: 0.9rem; display: inline; margin-left: 10px; margin-top: 0; }
+            .status-bar { font-size: 1rem; }
+            .clock { font-size: 1.2rem; }
+
+            .bomba-title { font-size: 1.3rem; }
+            .bomba-ppm { font-size: 3rem; min-width: 120px; padding: 10px 15px; }
+            .bomba-cont { font-size: 1.8rem; min-width: 100px; padding: 5px 12px; }
+            .bomba-ppm-label, .bomba-cont-label { font-size: 1rem; }
+            .bomba-btn { font-size: 1rem; padding: 10px 15px; max-width: 120px; }
+            .bombas-grid { gap: 20px; }
+            .bomba-card { padding: 15px 10px; }
+        }
+
+        @media (min-width: 1024px) {
+            .value-display { font-size: 5rem; }
+            .card-title { font-size: 1.8rem; }
+            .bomba-ppm { font-size: 3.5rem; }
+            .bomba-cont { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">
+        WELLCON
+        <span>SISTEMA DE TRANSMISSÃO MUDLOGGING</span>
+    </div>
+    <div class="status-bar">
+        <div>
+            <span id="status-dot" class="status-indicator"></span>
+            <span id="status-text">Desconectado</span>
+        </div>
+        <div id="clock" class="clock">00:00:00</div>
+    </div>
+</header>
+
+<main>
+    <!-- MENU PRINCIPAL -->
+    <div id="view-menu" class="view active">
+        <div class="menu-grid">
+            <button class="menu-btn" onclick="showView('view-bombas')">🚀 BOMBAS</button>
+            <button class="menu-btn" onclick="showView('view-rpm-mesa')">🔄 RPM MESA</button>
+            <button class="menu-btn" onclick="showView('view-rpm-desgas')">🔄 RPM DESGAS</button>
+            <button class="menu-btn" onclick="showView('view-profundidade')">📏 PROFUND</button>
+
+            <button class="menu-btn" onclick="showView('view-gas')">💨 GÁS</button>
+            <button class="menu-btn main-action" onclick="showView('view-gas-fisico')">🔥 GÁS FÍSICO</button>
+            <button class="menu-btn" onclick="showView('view-pressao')">📊 PRESSÃO</button>
+
+            <button class="menu-btn" onclick="showView('view-torque')">🔧 TORQUE</button>
+            <button class="menu-btn" onclick="showView('view-temp')">🌡️ TEMP</button>
+        </div>
+    </div>
+
+    <!-- TELA BOMBAS -->
+    <div id="view-bombas" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #FF6B35">🚀 BOMBAS 1 e 2 - PPM</div>
+            <div class="bombas-grid">
+                <div class="bomba-card">
+                    <div class="bomba-title" style="color: #FF6B35">🚀 BOMBA 1</div>
+                    <div class="bomba-ppm-label">PPM</div>
+                    <div id="val-ppm1" class="bomba-ppm">0</div>
+                    <div class="bomba-cont-label">CONTAGEM</div>
+                    <div id="val-cont1" class="bomba-cont">0</div>
+                    <button class="bomba-btn" onclick="zerarBomba1(this)">ZERAR</button>
+                </div>
+                <div class="bomba-card">
+                    <div class="bomba-title" style="color: #00B4D8">💧 BOMBA 2</div>
+                    <div class="bomba-ppm-label">PPM</div>
+                    <div id="val-ppm2" class="bomba-ppm">0</div>
+                    <div class="bomba-cont-label">CONTAGEM</div>
+                    <div id="val-cont2" class="bomba-cont">0</div>
+                    <button class="bomba-btn" onclick="zerarBomba2(this)">ZERAR</button>
+                </div>
+            </div>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
+    </div>
+
+    <!-- TELA RPM MESA -->
+    <div id="view-rpm-mesa" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #00B4D8">🔄 RPM DA MESA ROTATIVA</div>
+            <div class="sub-value">RPM</div>
+            <div id="val-rpm-mesa" class="value-display" style="color: #00FF00">0</div>
+            <div class="sub-value">Contagem de Pulsos: <span id="val-cont-rpm-mesa" style="color: white; font-size: 1.2rem;">0</span></div>
+            <button class="action-btn" onclick="zerarRPM_Mesa(this)">ZERAR</button>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
+    </div>
+
+    <!-- TELA RPM DESGASEIFICADOR -->
+    <div id="view-rpm-desgas" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #9B59B6">🔄 RPM DO DESGASEIFICADOR</div>
+            <div class="sub-value">RPM</div>
+            <div id="val-rpm-desgas" class="value-display" style="color: #9B59B6">0</div>
+            <div class="sub-value">Contagem de Pulsos: <span id="val-cont-rpm-desgas" style="color: white; font-size: 1.2rem;">0</span></div>
+            <button class="action-btn" onclick="zerarRPM_Desgas(this)">ZERAR</button>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
+    </div>
+
+    <!-- TELA PROFUNDIDADE -->
+    <div id="view-profundidade" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #FFD700">📏 PROFUNDIDADE</div>
+            <div class="sub-value">MODO ATUAL: <span id="val-modo" style="color: #FF6B35">CONTAGEM</span></div>
+            <div id="val-prof" class="value-display" style="color: #FFD700">0 m</div>
+            <div style="margin: 10px 0; color: white; font-size: 0.8rem; line-height: 1.4;">
+                Para usar a profundidade, pressione os dois botões juntos por 4 segundos<br>
+                <span style="color: #888; font-size: 0.7rem;">SENSOR 2 + SENSOR 1 = INCREMENTAR | SENSOR 1 + SENSOR 2 = DECREMENTAR</span>
+            </div>
+            <button class="action-btn" onclick="zerarProfundidade(this)">ZERAR</button>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
+    </div>
+
+    <!-- TELA GÁS -->
+    <div id="view-gas" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #FF6B35">💨 DETECTOR DE GÁS</div>
+            <div class="config-row">
+                <label for="gas-max">Máx:</label>
+                <input type="number" id="gas-max" value="100" onchange="atualizarGasMax()">
+                <label for="gas-unit">Unidade:</label>
+                <input type="text" id="gas-unit" value="UGT" onchange="atualizarGasUnit()">
+            </div>
+            <div id="val-gas" class="value-display" style="color: #00FF00">0 UGT</div>
+            <div class="progress-container">
+                <div id="progress-gas" class="progress-bar"></div>
+            </div>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
+    </div>
+
+    <!-- TELA PRESSÃO -->
+    <div id="view-pressao" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #00B4D8">📊 SENSOR DE PRESSÃO</div>
+            <div id="val-press" class="value-display" style="color: #00FF00">0.0 PSI</div>
+            <div class="progress-container">
+                <div id="progress-press" class="progress-bar" style="background: #00B4D8;"></div>
+            </div>
+            <button class="action-btn" onclick="taraPressao(this)">TARA</button>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
+    </div>
+
+    <!-- TELA TORQUE -->
+    <div id="view-torque" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #4ECDC4">🔧 SENSOR DE TORQUE</div>
+            <div id="val-torque" class="value-display" style="color: #4ECDC4">0.0 Nm</div>
+            <div class="progress-container">
+                <div id="progress-torque" class="progress-bar" style="background: #4ECDC4;"></div>
+            </div>
+            <button class="action-btn" onclick="taraTorque(this)">TARA</button>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
+    </div>
+
+    <!-- TELA TEMPERATURA -->
+    <div id="view-temp" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #FF6B6B">🌡️ SENSOR DE TEMPERATURA</div>
+            <div id="val-temp" class="value-display" style="color: #FF6B6B">0.0 °C</div>
+            <div class="progress-container">
+                <div id="progress-temp" class="progress-bar" style="background: #FF6B6B;"></div>
+            </div>
+            <button class="action-btn" onclick="taraTemp(this)">TARA</button>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
+    </div>
+
+    <!-- TELA GÁS FÍSICO -->
+    <div id="view-gas-fisico" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #E74C3C">🔥 GÁS FÍSICO</div>
+            <div class="dual-grid">
+                <div>
+                    <div class="sub-value">UGT</div>
+                    <div id="val-ugt" class="value-display" style="color: #00FF00; font-size: 2.5rem;">0</div>
+                    <div class="vu-container">
+                        <div class="vu-label">VU</div>
+                        <div id="vu-ugt" class="vu-bar"></div>
+                        <div id="vu-ugt-text" class="vu-text">0%</div>
+                    </div>
+                </div>
+                <div>
+                    <div class="sub-value">TC</div>
+                    <div id="val-tc" class="value-display" style="color: #00FF00; font-size: 2.5rem;">0</div>
+                    <div class="vu-container">
+                        <div class="vu-label">VU</div>
+                        <div id="vu-tc" class="vu-bar"></div>
+                        <div id="vu-tc-text" class="vu-text">0%</div>
+                    </div>
+                </div>
+            </div>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
+    </div>
+</main>
+
+<script>
+    /* ---------- CONFIGURAÇÃO MQTT ---------- */
+    const MQTT_BROKER = "broker.emqx.io";
+    const USE_SSL = (location.protocol === "https:");
+    const MQTT_PORT = USE_SSL ? 8084 : 8083;   // 8083 = ws, 8084 = wss
+    const DEVICE_ID = "esp32_wellguard_station01";
+    const TOPIC_DADOS = `wellguard/${DEVICE_ID}/dados`;
+    const TOPIC_COMANDOS = `wellguard/${DEVICE_ID}/comandos`;
+    const clientID = "web_client_" + Math.random().toString(16).substr(2, 8);
+    const client = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, "/mqtt", clientID);
+
+    /* ---------- ESTADO ---------- */
+    // Offsets de tara (nomes DIFERENTES das funções taraXxx)
+    let offsetPressao = 0, offsetTorque = 0, offsetTemp = 0;
+    let brutoPressao = 0, brutoTorque = 0, brutoTemp = 0;
+    let gasMax = 100;
+    let gasUnit = "UGT";
+    let ultimoSensorAna = 0;
+    let conectando = false;
+
+    function $(id) { return document.getElementById(id); }
+
+    /* ---------- GÁS ---------- */
+    function atualizarGasMax() {
+        const input = $('gas-max');
+        const valor = parseFloat(input.value);
+        if (!isNaN(valor) && valor > 0) { gasMax = valor; renderSensores(); }
+        else { input.value = gasMax; }
+    }
+
+    function atualizarGasUnit() {
+        const input = $('gas-unit');
+        const valor = input.value.trim();
+        if (valor.length > 0) { gasUnit = valor; renderSensores(); }
+        else { input.value = gasUnit; }
+    }
+
+    /* ---------- RENDER DOS SENSORES ANALÓGICOS ---------- */
+    function renderSensores() {
+        const v = ultimoSensorAna;
+
+        // Gás
+        const gas = Math.floor((v / 1023.0) * gasMax);
+        $('val-gas').innerText = gas + " " + gasUnit;
+        $('progress-gas').style.width = Math.min((gas / gasMax) * 100, 100) + "%";
+
+        // Pressão (4-20mA, 0-1000 PSI)
+        const tensao = (v / 1023.0) * 5.0;
+        let corrente = 4.0 + (tensao - 1.0) * (16.0 / 4.0);
+        corrente = Math.max(4.0, Math.min(20.0, corrente));
+        brutoPressao = ((corrente - 4.0) / 16.0) * 1000;
+        const pressao = Math.max(0, brutoPressao - offsetPressao);
+        $('val-press').innerText = pressao.toFixed(1) + " PSI";
+        $('progress-press').style.width = Math.min((pressao / 1000) * 100, 100) + "%";
+
+        // Torque (0-500 Nm)
+        brutoTorque = (v / 1023.0) * 500;
+        const torque = Math.max(0, brutoTorque - offsetTorque);
+        $('val-torque').innerText = torque.toFixed(1) + " Nm";
+        $('progress-torque').style.width = Math.min((torque / 500) * 100, 100) + "%";
+
+        // Temperatura (0-150 °C)
+        brutoTemp = (v / 1023.0) * 150;
+        const temp = Math.max(0, brutoTemp - offsetTemp);
+        $('val-temp').innerText = temp.toFixed(1) + " °C";
+        $('progress-temp').style.width = Math.min((temp / 150) * 100, 100) + "%";
+    }
+
+    /* ---------- NOTIFICAÇÃO ---------- */
+    function mostrarNotificacao(texto, isError = false) {
+        const anterior = document.querySelector('.notification');
+        if (anterior) anterior.remove();
+
+        const notif = document.createElement('div');
+        notif.className = 'notification' + (isError ? ' error' : '');
+        notif.innerText = texto;
+        document.body.appendChild(notif);
+
+        setTimeout(() => { if (notif.parentNode) notif.remove(); }, 2000);
+    }
+
+    /* ---------- MQTT ---------- */
+    client.onConnectionLost = function (resp) {
+        updateStatus(false);
+        console.error("❌ Conexão MQTT perdida:", resp.errorMessage);
+        conectando = false;
+        setTimeout(connectMQTT, 3000);
+    };
+
+    client.onMessageArrived = function (message) {
+        const topico = message.destinationName;
+        const raw = message.payloadString;
+        if (topico === TOPIC_COMANDOS) return;   // ignora eco dos próprios comandos
+        const data = parseTolerante(raw);
+        if (data) atualizarInterface(data);
+        else console.error("Mensagem ilegível:", raw);
+    };
+
+    // Lê JSON válido; se falhar (ex.: {"senso1", "PPM1":236}), extrai os pares "chave":valor
+    function parseTolerante(raw) {
+        try {
+            return JSON.parse(raw);
+        } catch (e) {
+            const data = {};
+            const re = /"([^"]+)"\s*:\s*(-?\d+(?:\.\d+)?|"[^"]*"|true|false|null)/g;
+            let m, achou = false;
+            while ((m = re.exec(raw)) !== null) {
+                try { data[m[1]] = JSON.parse(m[2]); achou = true; } catch (_) {}
+            }
+            return achou ? data : null;
+        }
+    }
+
+
+    function connectMQTT() {
+        if (conectando || client.isConnected()) return;
+        conectando = true;
+        console.log("🔌 Conectando ao MQTT...");
+        try {
+            client.connect({
+                onSuccess: function () {
+                    conectando = false;
+                    updateStatus(true);
+                    client.subscribe(`wellguard/${DEVICE_ID}/#`);
+                    console.log("✅ Conectado e inscrito em:", TOPIC_DADOS);
+                },
+                onFailure: function (e) {
+                    conectando = false;
+                    updateStatus(false);
+                    console.error("❌ Falha na conexão:", e.errorMessage);
+                    setTimeout(connectMQTT, 3000);
+                },
+                useSSL: USE_SSL,
+                keepAliveInterval: 30,
+                timeout: 10
+            });
+        } catch (e) {
+            conectando = false;
+            console.error("Erro no connect:", e);
+            setTimeout(connectMQTT, 3000);
+        }
+    }
+
+    function updateStatus(connected) {
+        const dot = $('status-dot');
+        const text = $('status-text');
+        if (connected) {
+            dot.classList.add('connected');
+            text.innerText = "Conectado (MQTT)";
+        } else {
+            dot.classList.remove('connected');
+            text.innerText = "Desconectado";
+        }
+    }
+
+    /* ---------- NAVEGAÇÃO ---------- */
+    function showView(viewId) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        const alvo = $(viewId);
+        if (alvo) alvo.classList.add('active');
+        else console.error("View não encontrada:", viewId);
+        window.scrollTo(0, 0);
+    }
+
+    /* ---------- COMANDOS ---------- */
+    function sendCommand(cmd, buttonElement) {
+        if (!client.isConnected()) {
+            mostrarNotificacao("❌ Sem conexão MQTT!", true);
+            return false;
+        }
+        try {
+            const message = new Paho.MQTT.Message(cmd);
+            message.destinationName = TOPIC_COMANDOS;
+            message.qos = 1;
+            client.send(message);
+
+            if (buttonElement) {
+                const originalText = buttonElement.innerText;
+                buttonElement.classList.add('sent');
+                buttonElement.innerText = '✓';
+                setTimeout(() => {
+                    buttonElement.classList.remove('sent');
+                    buttonElement.innerText = originalText;
+                }, 1000);
+            }
+            return true;
+        } catch (e) {
+            console.error("Erro ao enviar comando:", e);
+            mostrarNotificacao("❌ Erro ao enviar comando", true);
+            return false;
+        }
+    }
+
+    function zerarBomba1(btn) {
+        $('val-ppm1').innerText = '0';
+        $('val-cont1').innerText = '0';
+        if (sendCommand('ZERAR_B1', btn)) mostrarNotificacao('✅ Bomba 1 zerada!');
+    }
+
+    function zerarBomba2(btn) {
+        $('val-ppm2').innerText = '0';
+        $('val-cont2').innerText = '0';
+        if (sendCommand('ZERAR_B2', btn)) mostrarNotificacao('✅ Bomba 2 zerada!');
+    }
+
+    function zerarRPM_Mesa(btn) {
+        $('val-rpm-mesa').innerText = '0';
+        $('val-cont-rpm-mesa').innerText = '0';
+        if (sendCommand('ZERAR_RPM_MESA', btn)) mostrarNotificacao('✅ RPM Mesa zerada!');
+    }
+
+    function zerarRPM_Desgas(btn) {
+        $('val-rpm-desgas').innerText = '0';
+        $('val-cont-rpm-desgas').innerText = '0';
+        if (sendCommand('ZERAR_RPM_DESGAS', btn)) mostrarNotificacao('✅ RPM Desgasificador zerado!');
+    }
+
+    function zerarProfundidade(btn) {
+        $('val-prof').innerText = '0 m';
+        if (sendCommand('ZERAR_PROF', btn)) mostrarNotificacao('✅ Profundidade zerada!');
+    }
+
+    function taraPressao(btn) {
+        offsetPressao = brutoPressao;
+        renderSensores();
+        if (sendCommand('TARA_PRESS', btn)) mostrarNotificacao('✅ Tara de pressão aplicada!');
+    }
+
+    function taraTorque(btn) {
+        offsetTorque = brutoTorque;
+        renderSensores();
+        if (sendCommand('TARA_TORQUE', btn)) mostrarNotificacao('✅ Tara de torque aplicada!');
+    }
+
+    function taraTemp(btn) {
+        offsetTemp = brutoTemp;
+        renderSensores();
+        if (sendCommand('TARA_TEMP', btn)) mostrarNotificacao('✅ Tara de temperatura aplicada!');
+    }
+
+    /* ---------- DADOS ---------- */
+    function mapValue(x, in_min, in_max, out_min, out_max) {
+        return Math.floor((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min);
+    }
+
+    function atualizarVU(barId, textId, valor, maxValor) {
+        const percent = Math.max(0, Math.min((valor / maxValor) * 100, 100));
+        const bar = $(barId);
+        bar.style.height = percent + "%";
+        bar.style.background = percent < 60 ? '#00FF00' : (percent < 80 ? '#FFFF00' : '#FF0000');
+        $(textId).innerText = Math.floor(percent) + "%";
+    }
+
+    function pick(data, nomes) {
+        const norm = t => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const mapa = {};
+        for (const k in data) mapa[norm(k)] = data[k];
+        for (const n of nomes) {
+            const v = mapa[norm(n)];
+            if (v !== undefined && v !== null) return v;
+        }
+        return undefined;
+    }
+
+    function atualizarInterface(data) {
+        const cont1 = pick(data, ['contagem1', 'cont1', 'count1', 'pulsos1']);
+        const ppm1  = pick(data, ['PPM1', 'spm1', 'bomba1']);
+        const cont2 = pick(data, ['contagem2', 'cont2', 'count2', 'pulsos2']);
+        const ppm2  = pick(data, ['PPM2', 'spm2', 'bomba2']);
+        const rpmMesa  = pick(data, ['rpmMesa', 'rpm_mesa', 'RPM1']);
+        const contMesa = pick(data, ['contRpmMesa', 'cont_rpm_mesa', 'contagemRPM1']);
+        const rpmDes   = pick(data, ['rpmDesgas', 'rpm_desgas', 'RPM2']);
+        const contDes  = pick(data, ['contRpmDesgas', 'cont_rpm_desgas', 'contagemRPM2']);
+        const prof     = pick(data, ['Profundidade', 'prof', 'depth']);
+
+        if (cont1 !== undefined) $('val-cont1').innerText = cont1;
+        if (ppm1  !== undefined) $('val-ppm1').innerText = ppm1;
+        if (cont2 !== undefined) $('val-cont2').innerText = cont2;
+        if (ppm2  !== undefined) $('val-ppm2').innerText = ppm2;
+
+        const rm = rpmMesa !== undefined ? rpmMesa : ppm1;
+        if (rm !== undefined) {
+            $('val-rpm-mesa').innerText = rm;
+            $('val-cont-rpm-mesa').innerText = (contMesa !== undefined ? contMesa : cont1) || 0;
+        }
+        const rd = rpmDes !== undefined ? rpmDes : ppm2;
+        if (rd !== undefined) {
+            $('val-rpm-desgas').innerText = rd;
+            $('val-cont-rpm-desgas').innerText = (contDes !== undefined ? contDes : cont2) || 0;
+        }
+
+        if (prof !== undefined) $('val-prof').innerText = prof + " m";
+
+        const ana = pick(data, ['sensorAna', 'analog', 'sensor_ana']);
+        if (ana !== undefined) {
+            ultimoSensorAna = parseFloat(ana) || 0;
+            renderSensores();
+        }
+
+        const ugtRaw = pick(data, ['UGT1', 'UGT']);
+        if (ugtRaw !== undefined) {
+            const ugt = mapValue(parseInt(ugtRaw), 0, 1023, 0, 400);
+            $('val-ugt').innerText = ugt;
+            atualizarVU('vu-ugt', 'vu-ugt-text', ugt, 400);
+        }
+        const tcRaw = pick(data, ['TC1', 'TC']);
+        if (tcRaw !== undefined) {
+            const tc = mapValue(parseInt(tcRaw), 0, 1023, 0, 4000);
+            $('val-tc').innerText = tc;
+            atualizarVU('vu-tc', 'vu-tc-text', tc, 4000);
+        }
+    }
+
+    function updateClock() {
+        $('clock').innerText = new Date().toLocaleTimeString('pt-BR');
+    }
+
+    setInterval(updateClock, 1000);
+    updateClock();
+    connectMQTT();
+</script>
+</body>
+</html>
